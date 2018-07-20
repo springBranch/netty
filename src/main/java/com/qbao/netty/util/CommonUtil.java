@@ -3,9 +3,9 @@ package com.qbao.netty.util;
 import com.qbao.log.QbLogger;
 import com.qbao.log.QbLoggerManager;
 import com.qbao.netty.conf.Config;
-import org.jboss.netty.channel.Channel;
-import org.jboss.netty.handler.codec.http.HttpRequest;
-import org.jboss.netty.handler.codec.http.QueryStringDecoder;
+import io.netty.channel.Channel;
+import io.netty.handler.codec.http.HttpRequest;
+import io.netty.handler.codec.http.QueryStringDecoder;
 
 import javax.mail.Message;
 import javax.mail.MessagingException;
@@ -195,12 +195,12 @@ public class CommonUtil {
 			return null;
 		}
 		param = param.toLowerCase();
-		if(httpRequest.getHeader(PARAM_HEADER) != null) {
-			return httpRequest.getHeader(PARAM_HEADER + param);
+		if(httpRequest.headers().get(PARAM_HEADER) != null) {
+			return httpRequest.headers().get(PARAM_HEADER + param);
 		}
 		Map<String, List<String>> paramMap = new QueryStringDecoder(
-				URLDecoder.decode(httpRequest.getUri(), encodeing), 
-				Charset.forName(encodeing)).getParameters();
+				URLDecoder.decode(httpRequest.uri(), encodeing),
+				Charset.forName(encodeing)).parameters();
 
 		for(Entry<String, List<String>> entry:paramMap.entrySet()) {
 			if(entry.getKey().toLowerCase().equals(param)) {
@@ -218,7 +218,7 @@ public class CommonUtil {
 		try {
 			Map<String, List<String>> parame = new QueryStringDecoder(
 					URLDecoder.decode(httpRequest.getUri(), "UTF-8"),
-					Charset.forName("UTF-8")).getParameters();
+					Charset.forName("UTF-8")).parameters();
 			Iterator<Entry<String, List<String>>> iterator = parame.entrySet().iterator();
 			while (iterator.hasNext()) {
 				Entry<String, List<String>> next = iterator.next();
@@ -297,19 +297,22 @@ public class CommonUtil {
 	
 	public static String getRemoteIP(HttpRequest httpRequest) {
 		String ip = null;
-		String[] headers = new String[]{"X-Forwarded-For","REMOTE_ADDR",
-			"HTTP_CLIENT_IP", "HTTP_VIA"};
-		for(String header:headers) {
-			ip = httpRequest.getHeader(header);
-			if(ip != null && !ip.isEmpty()) {
+		String[] headers = new String[]{"X-Forwarded-For", "REMOTE_ADDR",
+				"HTTP_CLIENT_IP", "HTTP_VIA"};
+		for (String header : headers) {
+			ip = httpRequest.headers().get(header);
+			if (ip != null && !ip.isEmpty()) {
 				return ip;
 			}
 		}
+
+		if (ip == null)
+			ip = "0";
 		return ip;
 	}
 	
 	public static String getRemoteIP(Channel channel) {
-		String ip = channel.getRemoteAddress().toString();
+		String ip = channel.remoteAddress().toString();
 		return ip.substring(1, ip.indexOf(':'));
 	}
 	

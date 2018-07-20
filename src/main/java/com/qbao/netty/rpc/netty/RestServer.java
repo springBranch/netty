@@ -5,7 +5,7 @@ package com.qbao.netty.rpc.netty;
 
 import com.qbao.log.QbLogger;
 import com.qbao.log.QbLoggerManager;
-import org.jboss.netty.handler.codec.http.HttpMethod;
+import io.netty.handler.codec.http.HttpMethod;
 
 /**
  * @author li_yao
@@ -22,6 +22,7 @@ public class RestServer extends HttpServer {
      */
     public RestServer(String serverName, boolean sendException) {
         super(serverName, sendException);
+        initDefault();
     }
 
     public void addHandler(HttpMethod method, String uri,
@@ -32,6 +33,10 @@ public class RestServer extends HttpServer {
     @Override
     final protected HttpRequestParser getHttpRequestParser() {
         return restParser;
+    }
+
+    public void initDefault(){
+        restParser.addHandler(HttpMethod.GET, "/favicon.ico", FaviconHandler.class);
     }
 
 }

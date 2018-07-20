@@ -3,17 +3,14 @@ package com.qbao.netty.rpc.netty;
 import com.qbao.log.QbLogger;
 import com.qbao.log.QbLoggerManager;
 import com.qbao.netty.conf.Config;
-import com.qbao.netty.util.CommonUtil;
-import org.jboss.netty.channel.*;
-import org.jboss.netty.handler.codec.http.*;
-import org.jboss.netty.handler.stream.ChunkedWriteHandler;
+import io.netty.channel.*;
+import io.netty.channel.socket.SocketChannel;
+import io.netty.handler.codec.http.FullHttpRequest;
+import io.netty.handler.codec.http.HttpObjectAggregator;
+import io.netty.handler.codec.http.HttpServerCodec;
 
 import java.io.BufferedReader;
 import java.io.IOException;
-import java.nio.charset.Charset;
-import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -36,8 +33,6 @@ public abstract class HttpServer extends AbstractServer {
 
     public static String CLIENT_IP_HEADER = "Netty-Client-IP";
 
-    private final int maxRequestLen;
-
     private ExecutorService executor;
     private Object executorLock = new Object();
 
@@ -46,10 +41,9 @@ public abstract class HttpServer extends AbstractServer {
     protected final String deployVersion;
 
 
-    static class HttpHandler extends SimpleChannelUpstreamHandler {
+    static class HttpHandler extends SimpleChannelInboundHandler<FullHttpRequest> {
         HttpServer server;
         long accessTime;
-        Object errorTag = new Object();
 
         HttpHandler(HttpServer server, long accessTime) {
             this.server = server;
@@ -57,51 +51,16 @@ public abstract class HttpServer extends AbstractServer {
         }
 
         @Override
-        public void messageReceived(ChannelHandlerContext ctx,
-                                    MessageEvent e) throws Exception {
-            HttpRequest httpRequest = (HttpRequest) e.getMessage();
+        public void channelRead0(ChannelHandlerContext ctx, FullHttpRequest httpRequest) throws Exception {
 
-            //transfer parameters to headers for reuse
-            httpRequest.setHeader(CommonUtil.PARAM_HEADER, "true");
-            String encodeing = "UTF-8";
-            Map<String, List<String>> paramMap = new QueryStringDecoder(
-                    httpRequest.getUri(),
-                    Charset.forName(encodeing)).getParameters();
-            for (Entry<String, List<String>> entry : paramMap.entrySet()) {
-                if (!entry.getKey().isEmpty() && entry.getValue() != null &&
-                        entry.getValue().size() > 0) {
-                    httpRequest.setHeader(CommonUtil.PARAM_HEADER +
-                            entry.getKey().toLowerCase(), entry.getValue().get(0));
-                }
-            }
-
-            if (!CommonUtil.getBooleanParam(httpRequest, "noLogging") &&
-                    HttpUtil.getUri(httpRequest.getUri()).matches(
-                            Config.get().get("access.logged.uri.reges", ".*"))) {
-                httpRequest.setHeader("access-logged", true);
-                if (httpRequest.getContent() != null) {
-                    httpRequest.setHeader("request-content-length",
-                            httpRequest.getContent().readableBytes());
-                    if (HttpUtil.getUri(httpRequest.getUri()).matches(
-                            Config.get().get("access.content.logged.uri.reges",
-                                    "(?!.)"))) {
-                        httpRequest.setHeader("request-content-index-for-log",
-                                httpRequest.getContent().readerIndex() + "-" +
-                                        httpRequest.getContent().writerIndex());
-                    }
-                }
-            }
-
+            //计数器 +1 内存不回收。
+            httpRequest.content().retain();
             HttpRequestParser parser = server.getHttpRequestParser();
-            //bind client IP
-            httpRequest.removeHeader(CLIENT_IP_HEADER);
-            httpRequest.setHeader(CLIENT_IP_HEADER,
-                    CommonUtil.getRemoteIP(e.getChannel()));
             HttpRequestHandler handler = parser.parse(httpRequest);
             handler.setServer(server);
             handler.setTimeStamp(accessTime);
             handler.setRequest(httpRequest);
-            handler.setChannel(e.getChannel());
+            handler.setChannel(ctx.channel());
             handler.setSendException(server.sendException);
 
             ExecutorService executor = parser.getExecutor(handler.getClass());
@@ -109,53 +68,39 @@ public abstract class HttpServer extends AbstractServer {
                 executor = server.getExecutor();
             }
             executor.submit(handler);
+
         }
 
+        /**
+         * 异常处理
+         *
+         * @param ctx
+         * @param e
+         * @throws Exception
+         */
         @Override
         public void exceptionCaught(ChannelHandlerContext ctx,
-                                    ExceptionEvent e) throws Exception {
-            //async netty operation exception caught may lead to dead snoop
-            //so should tag the exception to avoid the case
-            Object tag = ctx.getAttachment();
-            if (tag == null) {
-                if (e.getCause() instanceof IllegalAccessException ||
-                        e.getCause() instanceof IllegalArgumentException) {
-                    logger.warn("{}-first exceptionCaught,send error",
-                            e.getCause(), ctx.getChannel());
-                } else {
-                    logger.error("{}-first exceptionCaught,send error",
-                            e.getCause(), ctx.getChannel());
-                }
-                ctx.setAttachment(errorTag);
-                HttpUtil.sendHttpResponse(ctx.getChannel(), null, e.getCause(),
-                        server.sendException, accessTime);
-            } else if (tag == errorTag) {
-                ctx.getChannel().close();//async
-                logger.warn("{}-has already caught exception," +
-                        "don't send error any more in case the dead loop " +
-                        "just close the channel", e.getCause(), ctx.getChannel());
-            } else {
-                ctx.getChannel().close();//async
-                logger.error("{}-unexpected attachment:{} bind,close the " +
-                        "channel", e.getCause(), ctx.getChannel());
-            }
+                                    Throwable e) throws Exception {
 
+            logger.error("exceptionCaught,send error - {}, close channel - {}", e.getCause(), ctx.channel());
+
+            HttpUtil.sendHttpResponse(ctx.channel(), null, e, server.sendException, accessTime);
+
+            e.printStackTrace();
+
+            ctx.channel().close();//async
         }
 
-    }
 
-    ;
+    }
 
 
     public HttpServer(String serverName, boolean sendException) {
         super(serverName);
-        maxRequestLen = Config.get().getInt(
-                "server.request.max.length.bytes", 100 * 1024 * 1024);
         this.sendException = sendException;
         BufferedReader br = null;
         String version = null;
         try {
-            //br = new BufferedReader(new FileReader("../deploy.version"));
             version = "lexis1.0";
         } finally {
             deployVersion = version;
@@ -194,40 +139,30 @@ public abstract class HttpServer extends AbstractServer {
     }
 
 
+    /**
+     * add childHandler
+     *
+     * @return
+     */
     @Override
-    public ChannelCollectablePipelineFactory createPipelineFactory() {
-        return new ChannelCollectablePipelineFactory() {
-
+    public ChannelHandler createPipelineFactory() {
+        return new ChannelInitializer<SocketChannel>() {
             @Override
-            protected void processPipeline(final ChannelPipeline pipeline,
-                                           long accessTime) {
-                pipeline.addLast("decoder", new HttpRequestDecoder());
-                pipeline.addLast("aggregator",
-                        new HttpChunkAggregator(maxRequestLen));
-                pipeline.addLast("encoder", new HttpResponseEncoder());
-                pipeline.addLast("deflater", new HttpContentCompressor());
-                pipeline.addLast("chunkedWriter", new ChunkedWriteHandler());
+            protected void initChannel(SocketChannel ch) throws Exception {
+                long accessTime = System.currentTimeMillis();
+                ChannelPipeline p = ch.pipeline();
+//                p.addLast(new HttpRequestDecoder());
+//                p.addLast(new HttpObjectAggregator(65536));
+//                p.addLast(new HttpResponseEncoder());
+//                p.addLast(new HttpContentCompressor());
+//                p.addLast(new ChunkedWriteHandler());
+//                p.addLast(new HttpHandler(HttpServer.this, accessTime));
 
-                pipeline.addLast("lastHanler",
-                        new HttpHandler(HttpServer.this, accessTime));
+
+                p.addLast(new HttpServerCodec());
+                p.addLast(new HttpObjectAggregator(65536));
+                p.addLast(new HttpHandler(HttpServer.this, accessTime));
             }
-
         };
     }
-
-
-    @Override
-    public void getMonitorInfos(String prefix, Map<String, Object> map) {
-        super.getMonitorInfos(prefix, map);
-        prefix += HttpServer.class.getSimpleName() + ".";
-        map.put(prefix + "deploy.version", deployVersion);
-        map.put(prefix + "getHttpRequestParser()", getHttpRequestParser());
-        map.put(prefix + "maxRequestLen", maxRequestLen);
-        map.put(prefix + "sendException", sendException);
-        map.put(prefix + "server.executor.queue.info",
-                CommonUtil.getThreadPoolInfo((ThreadPoolExecutor) getExecutor()));
-//        map.put(prefix + "log4j.executor.queue.info",
-//                CommonUtil.getThreadPoolInfo(AbstractESLogger.executor));
-    }
-
 }

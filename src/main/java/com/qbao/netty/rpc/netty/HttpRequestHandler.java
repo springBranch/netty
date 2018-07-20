@@ -1,22 +1,22 @@
 package com.qbao.netty.rpc.netty;
 
-import org.jboss.netty.channel.Channel;
-import org.jboss.netty.handler.codec.http.HttpRequest;
 
 import com.qbao.netty.rpc.AbstractRequestHandler;
+import io.netty.channel.Channel;
+import io.netty.handler.codec.http.FullHttpRequest;
 
 public abstract class HttpRequestHandler extends AbstractRequestHandler {
 	
 	
-	protected HttpRequest httpRequest;
+	protected FullHttpRequest httpRequest;
 	
 	protected Channel channel;
 	
 	protected boolean sendException = false;
 
 	@Override
-	final public void setRequest(Object request) throws Exception {
-		httpRequest = (HttpRequest)request;
+	final public void setRequest(FullHttpRequest request) throws Exception {
+		httpRequest = request;
 	}
 	
 	

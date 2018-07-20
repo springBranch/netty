@@ -62,24 +62,30 @@ public class Config extends AbstractConfig {
         try {
             if (BASE_CONFIG == null) {
                 synchronized (Config.class) {
-                    if (BASE_CONFIG == null) {
-						BASE_CONFIG = new Config(System.getProperty(LoadValues.BASE_CONFIG_PATH));
 
-                        System.out.println("base.config.path = " +System.getProperty(LoadValues.BASE_CONFIG_PATH,""));
+                    String basePath = System.getProperty(LoadValues.BASE_CONFIG_PATH);
 
-                        if (!BASE_CONFIG.confFile.exists()) {
-                            System.out.println("base.config.path not found");
-                        }else {
-                            BASE_CONFIG.load();
-                        }
-					}
-				}
-			}
-		}catch (Exception ex){
-			ex.printStackTrace();
-		}
-		return BASE_CONFIG;
-	}
+                    if (basePath == null){
+                        throw new NullPointerException("base.config.path is null");
+                    }
+
+                    BASE_CONFIG = new Config(System.getProperty(LoadValues.BASE_CONFIG_PATH));
+
+                    System.out.println("base.config.path = " + System.getProperty(LoadValues.BASE_CONFIG_PATH, ""));
+
+                    if (!BASE_CONFIG.confFile.exists()) {
+                        System.out.println("base.config.path not found");
+                    } else {
+                        BASE_CONFIG.load();
+                    }
+                }
+
+            }
+        } catch (Exception ex) {
+            ex.printStackTrace();
+        }
+        return BASE_CONFIG;
+    }
 
     private static Config CONFIG;
 
@@ -101,11 +107,11 @@ public class Config extends AbstractConfig {
         Timer timer = new Timer();
 
         DefaultConfig() {
-            super(System.getProperty(LoadValues.LOAD_CONFIG_PATH,""));
+            super(System.getProperty(LoadValues.LOAD_CONFIG_PATH, ""));
 
-            System.out.println("load.config.path = " +System.getProperty(LoadValues.LOAD_CONFIG_PATH,""));
+            System.out.println("load.config.path = " + System.getProperty(LoadValues.LOAD_CONFIG_PATH, ""));
 
-            if (!confFile.exists()){
+            if (!confFile.exists()) {
                 System.out.println("load.config.path not found");
                 return;
             }

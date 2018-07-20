@@ -1,15 +1,6 @@
 package com.qbao.netty.util.xml;
 
-import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.util.Map;
-import java.util.Map.Entry;
-
+import io.netty.handler.codec.http.HttpRequest;
 import org.dom4j.Document;
 import org.dom4j.DocumentException;
 import org.dom4j.DocumentHelper;
@@ -17,8 +8,10 @@ import org.dom4j.Element;
 import org.dom4j.io.OutputFormat;
 import org.dom4j.io.SAXReader;
 import org.dom4j.io.XMLWriter;
-import org.jboss.netty.buffer.ChannelBufferInputStream;
-import org.jboss.netty.handler.codec.http.HttpRequest;
+
+import java.io.*;
+import java.util.Map;
+import java.util.Map.Entry;
 
 /**
  * @Description
@@ -109,9 +102,10 @@ public class XMLHelper {
 	
 	public static Document create(HttpRequest httpRequest)
 			throws DocumentException, IOException{
-        return create(new ChannelBufferInputStream(httpRequest.getContent()));
+//        return create(new ChannelInputStream(httpRequest.getContent()));
+		return null;
 	}
-	
+
 	public static Document create(File file) 
 			throws DocumentException, IOException{
 		return create(new FileInputStream(file), true);

@@ -1,4 +1,7 @@
 package com.qbao.netty.rpc;
+
+import io.netty.handler.codec.http.FullHttpRequest;
+
 /**
  * 
  * <br>
@@ -16,7 +19,7 @@ public interface RequestHandler extends Runnable {
 	
 	void setServer(Server server);
 	
-	void setRequest(Object request)throws Exception;
+	void setRequest(FullHttpRequest request)throws Exception;
 	
 	void setTimeStamp(long timeStamp);
 	
