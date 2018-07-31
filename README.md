@@ -48,3 +48,35 @@ back.file.name=db-back.properties
     此properties配置主要用于配置业务调用配置荐
     调用
     Config.get().getInt("test.int")
+    
+#### maven
+```
+            <dependency>
+            <groupId>com.qbao.netty</groupId>
+            <artifactId>common</artifactId>
+            <version>2.0.0</version>
+        </dependency>
+
+```
+
+#### 使用
+```
+public class Main  {
+
+    private static QbLogger logger = QbLoggerManager.getLogger(Main.class);
+
+    public static void main(String[] args) {
+        try {
+            System.setProperty("log4j2.debug", "INFO");
+            RestServer restServer = new RestServer("server", false);
+            restServer.start(29011);
+        } catch (IOException var2) {
+            var2.printStackTrace();
+            System.exit(1);
+        }
+
+    }
+}
+
+
+```
